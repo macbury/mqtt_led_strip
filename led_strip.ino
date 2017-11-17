@@ -1,10 +1,16 @@
+#include <ArduinoJson.h>
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include "credentials.c"
 
+const int JSON_BUFFER_SIZE = JSON_OBJECT_SIZE(10);
+const char* CMD_ON = "ON";
+const char* CMD_OFF = "OFF";
+
 WiFiClient espClient;
 PubSubClient client(espClient);
+
 void setupWifi() {
   delay(10);
   Serial.println("Connecting to: ");
@@ -30,6 +36,8 @@ void ensureWiFiConnection() {
 }
 
 void ensureMqttConnection() {
+  //TODO send current state off and turn leds off if no connection.
+  
   while (!client.connected()) {
     delay(1000);
     Serial.println("Attempting MQTT connection...");
@@ -40,7 +48,7 @@ void ensureMqttConnection() {
     Serial.println(clientId);
     if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD)) {
       Serial.println("connected");
-      client.subscribe(MQTT_TOPIC);
+      client.subscribe(MQTT_SET_TOPIC);
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -54,20 +62,40 @@ void ensureMqttConnection() {
 void on_mqtt_message(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
   Serial.print(topic);
-  Serial.print("] ");
+  Serial.println("] ");
+  /**
+   * Transform this to more normal stuff like array of char not a bytefuck
+   */
+  char message[length + 1];
   for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
+    message[i] = (char)payload[i];
   }
-  Serial.println();
+  message[length] = '\0';
+  Serial.println(message);
 
-  // Switch on the LED if an 1 was received as first character
-  if ((char)payload[0] == '1') {
-    digitalWrite(BUILTIN_LED, LOW);   // Turn the LED on (Note that LOW is the voltage level
-    // but actually the LED is on; this is because
-    // it is acive low on the ESP-01)
-  } else {
-    digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off by making the voltage HIGH
+  processJson(message);
+}
+
+/**
+ * Parse out everything about action
+ */
+boolean processJson(char * rawJson) {
+  StaticJsonBuffer<JSON_BUFFER_SIZE> jsonBuffer;
+  JsonObject& root = jsonBuffer.parseObject(rawJson);
+
+  if (!root.success()) {
+    Serial.println(rawJson);
+    Serial.println("json is fucked up!");
+    return false;
   }
+
+  boolean enabled = root["state"] == CMD_ON;
+  if (enabled) {
+    digitalWrite(BUILTIN_LED, LOW); 
+  } else {
+    digitalWrite(BUILTIN_LED, HIGH);
+  }
+  return true;
 }
 
 void setup() {
@@ -84,5 +112,4 @@ void loop() {
   if (client.connected()) {
     client.loop();
   }
-  
 }
