@@ -1,15 +1,29 @@
 #include <ArduinoJson.h>
 #include <EEPROM.h>
+#include <Adafruit_NeoPixel.h>
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include "credentials.c"
 
+#define PIN_LED_STRIP D4
+#define PIXEL_COUNT 30
 const int JSON_BUFFER_SIZE = JSON_OBJECT_SIZE(10);
 const char* CMD_ON = "ON";
 const char* CMD_OFF = "OFF";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIN_LED_STRIP, NEO_GRB + NEO_KHZ800);
+
+typedef struct {
+  byte red;
+  byte green;
+  byte blue;
+  byte brightness;
+  byte enabled;
+} LedState;
+
+LedState currentState;
 
 void setupWifi() {
   delay(10);
@@ -36,8 +50,6 @@ void ensureWiFiConnection() {
 }
 
 void ensureMqttConnection() {
-  //TODO send current state off and turn leds off if no connection.
-  
   while (!client.connected()) {
     delay(1000);
     Serial.println("Attempting MQTT connection...");
@@ -49,6 +61,7 @@ void ensureMqttConnection() {
     if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD)) {
       Serial.println("connected");
       client.subscribe(MQTT_SET_TOPIC);
+      sendCurrentState();
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -73,7 +86,9 @@ void on_mqtt_message(char* topic, byte* payload, unsigned int length) {
   message[length] = '\0';
   Serial.println(message);
 
-  processJson(message);
+  if (processJson(message)) {
+    sendCurrentState();
+  }
 }
 
 /**
@@ -89,19 +104,62 @@ boolean processJson(char * rawJson) {
     return false;
   }
 
-  boolean enabled = root["state"] == CMD_ON;
-  if (enabled) {
-    digitalWrite(BUILTIN_LED, LOW); 
-  } else {
-    digitalWrite(BUILTIN_LED, HIGH);
+  currentState.enabled = root["state"] == CMD_ON;
+
+  if (root.containsKey("color")) {
+    currentState.red = root["color"]["r"];
+    currentState.green = root["color"]["g"];
+    currentState.blue = root["color"]["b"];
   }
+
+  if (root.containsKey("brightness")) {
+    currentState.brightness = root["brightness"];
+  }
+
   return true;
 }
 
+/**
+ * Inform mqtt component in home assistant about light state
+ */
+void sendCurrentState() {
+  StaticJsonBuffer<JSON_BUFFER_SIZE> jsonBuffer;
+  JsonObject& root = jsonBuffer.createObject();
+
+  root["state"] = currentState.enabled ? CMD_ON : CMD_OFF;
+  JsonObject& color = root.createNestedObject("color");
+  color["r"] = currentState.red;
+  color["g"] = currentState.green;
+  color["b"] = currentState.blue;
+
+  root["brightness"] = currentState.brightness;
+  //root["effect"] = effectString.c_str();
+
+  char buffer[root.measureLength() + 1];
+  root.printTo(buffer, sizeof(buffer));
+  client.publish(MQTT_STATE_TOPIC, buffer, true);
+}
+
+void updateLeds() {
+  int color = strip.Color(currentState.red, currentState.green, currentState.blue);
+  for (uint16_t i=0; i < strip.numPixels(); i++) {
+    if (currentState.enabled) {
+      strip.setPixelColor(i, color);
+    } else {
+      strip.setPixelColor(i, 0);
+    }
+  }
+  strip.setBrightness(currentState.brightness);
+  strip.show();  
+}
+
 void setup() {
-  pinMode(BUILTIN_LED, OUTPUT);
+  currentState = { 255, 255, 255, 100, false };
+  pinMode(BUILTIN_LED, INPUT);
+  strip.begin();
   Serial.begin(115200);
   ensureWiFiConnection();
+  strip.show();
   client.setServer(MQTT_HOST, MQTT_PORT);
   client.setCallback(on_mqtt_message);
 }
@@ -112,4 +170,8 @@ void loop() {
   if (client.connected()) {
     client.loop();
   }
+
+  delay(100);
+
+  updateLeds();
 }
