@@ -4,6 +4,7 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include "credentials.c"
+#include "Effect.h"
 
 #define PIN_LED_STRIP D4
 #define PIXEL_COUNT 30
@@ -15,15 +16,8 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIN_LED_STRIP, NEO_GRB + NEO_KHZ800);
 
-typedef struct {
-  byte red;
-  byte green;
-  byte blue;
-  byte brightness;
-  byte enabled;
-} LedState;
-
 LedState currentState;
+Effect * effect;
 
 void setupWifi() {
   delay(10);
@@ -133,7 +127,7 @@ void sendCurrentState() {
   color["b"] = currentState.blue;
 
   root["brightness"] = currentState.brightness;
-  //root["effect"] = effectString.c_str();
+  root["effect"] = effect->name();
 
   char buffer[root.measureLength() + 1];
   root.printTo(buffer, sizeof(buffer));
@@ -141,16 +135,8 @@ void sendCurrentState() {
 }
 
 void updateLeds() {
-  int color = strip.Color(currentState.red, currentState.green, currentState.blue);
-  for (uint16_t i=0; i < strip.numPixels(); i++) {
-    if (currentState.enabled) {
-      strip.setPixelColor(i, color);
-    } else {
-      strip.setPixelColor(i, 0);
-    }
-  }
-  strip.setBrightness(currentState.brightness);
-  strip.show();  
+  effect->update(strip, currentState);
+  strip.show();
 }
 
 void setup() {
@@ -162,6 +148,8 @@ void setup() {
   strip.show();
   client.setServer(MQTT_HOST, MQTT_PORT);
   client.setCallback(on_mqtt_message);
+
+  effect = new Effect(currentState);
 }
 
 void loop() {
