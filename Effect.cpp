@@ -21,21 +21,13 @@ void Effect::update(Adafruit_NeoPixel &strip) {
   _currentState.green = lerp(_alpha, _initialState.green, _targetState.green);
   _currentState.blue = lerp(_alpha, _initialState.blue, _targetState.blue);
   _currentState.brightness = lerp(_alpha, _initialState.brightness, _targetState.brightness);
-  _currentState.enabled = _targetState.enabled;
+  _currentState.enabled = _initialState.enabled;
   
   int color = strip.Color(_currentState.red, _currentState.green, _currentState.blue);
   for (uint16_t i=0; i < strip.numPixels(); i++) {
-    if (_currentState.enabled) {
-      strip.setPixelColor(i, color);
-    } else {
-      strip.setPixelColor(i, 0);
-    }
+    strip.setPixelColor(i, color);
   }
-  if (_currentState.enabled) {
-    strip.setBrightness(_currentState.brightness);
-  } else {
-    strip.setBrightness(0);
-  }
+  strip.setBrightness(_currentState.brightness);
 }
 
 LedState Effect::getCurrentState() {
@@ -51,3 +43,10 @@ void Effect::begin(LedState targetState) {
   _targetState = targetState;
   _alpha = 0.0f;
 }
+
+void Effect::end() {
+  _initialState = _currentState;
+  _targetState = { 0, 0, 0, 0, false };
+  _alpha = 0.0f;
+}
+

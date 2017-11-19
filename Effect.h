@@ -17,6 +17,7 @@ class Effect {
     Effect();
     void update(Adafruit_NeoPixel &strip);
     void begin(LedState targetState);
+    void end();
     String name();
     LedState getCurrentState();
   private:

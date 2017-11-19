@@ -112,8 +112,12 @@ boolean processJson(char * rawJson) {
     currentState.brightness = root["brightness"];
   }
 
-  effect->begin(currentState);
-
+  if (currentState.enabled) {
+    effect->begin(currentState);
+  } else {
+    effect->end();
+  }
+  
   return true;
 }
 
