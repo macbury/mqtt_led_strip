@@ -25,23 +25,12 @@ void setupWifi() {
   Serial.println("Connecting to: ");
   Serial.println(WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-
+  delay(1000);
   randomSeed(micros());
-
   Serial.println("");
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
-}
-
-void ensureWiFiConnection() {
-  if (WiFi.status() != WL_CONNECTED) {
-    setupWifi();
-  }
 }
 
 void ensureMqttConnection() {
@@ -55,6 +44,8 @@ void ensureMqttConnection() {
     Serial.println(clientId);
     if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD)) {
       Serial.println("connected");
+      Serial.println("IP address: ");
+      Serial.println(WiFi.localIP());
       client.subscribe(MQTT_SET_TOPIC);
       sendCurrentState();
     } else {
@@ -155,26 +146,24 @@ void updateLeds() {
 }
 
 void setup() {
+  Serial.begin(115200);
   currentState = { 255, 255, 255, 100, false };
   pinMode(BUILTIN_LED, INPUT);
   strip.begin();
-  Serial.begin(115200);
-  ensureWiFiConnection();
   strip.show();
   client.setServer(MQTT_HOST, MQTT_PORT);
   client.setCallback(on_mqtt_message);
 
   effect = new Effect();
+  setupWifi();
 }
 
 void loop() {
-  ensureWiFiConnection();
   ensureMqttConnection();
   if (client.connected()) {
     client.loop();
   }
-
-  delay(100);
-
+  
+  delay(33);
   updateLeds();
 }

@@ -1,7 +1,7 @@
 #include "Effect.h"
 
-float lerp(float t, float a, float b){
-  return (1-t)*a + t*b;
+byte lerp(float progress, float fromValue, float toValue){
+  return (int)(fromValue + (toValue - fromValue) * progress);
 }
 
 Effect::Effect(){
@@ -16,10 +16,12 @@ void Effect::update(Adafruit_NeoPixel &strip) {
   if (_alpha >= 1.0f) {
     _alpha = 1.0f; 
   }
+  
   _currentState.red = lerp(_alpha, _initialState.red, _targetState.red);
   _currentState.green = lerp(_alpha, _initialState.green, _targetState.green);
   _currentState.blue = lerp(_alpha, _initialState.blue, _targetState.blue);
   _currentState.brightness = lerp(_alpha, _initialState.brightness, _targetState.brightness);
+  _currentState.enabled = _targetState.enabled;
   
   int color = strip.Color(_currentState.red, _currentState.green, _currentState.blue);
   for (uint16_t i=0; i < strip.numPixels(); i++) {
