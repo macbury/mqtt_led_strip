@@ -20,7 +20,8 @@ LedState currentState;
 Effect * effect;
 
 void setupWifi() {
-  delay(10);
+  delay(1000);
+  Serial.println("----------");
   Serial.println("Connecting to: ");
   Serial.println(WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -100,6 +101,16 @@ boolean processJson(char * rawJson) {
 
   currentState.enabled = root["state"] == CMD_ON;
 
+  if (root.containsKey("effect")) {
+    delete effect;
+    if (root["effect"] == "Fade") {
+      Serial.println("Changing effect to Fade");
+      effect = new Effect();
+    } else {
+      Serial.println("Unsuported effect");
+    }
+  }
+
   if (root.containsKey("color")) {
     currentState.red = root["color"]["r"];
     currentState.green = root["color"]["g"];
@@ -109,6 +120,8 @@ boolean processJson(char * rawJson) {
   if (root.containsKey("brightness")) {
     currentState.brightness = root["brightness"];
   }
+
+  effect->begin(currentState);
 
   return true;
 }
@@ -131,11 +144,13 @@ void sendCurrentState() {
 
   char buffer[root.measureLength() + 1];
   root.printTo(buffer, sizeof(buffer));
+  Serial.println("Sending current state:");
+  Serial.println(buffer);
   client.publish(MQTT_STATE_TOPIC, buffer, true);
 }
 
 void updateLeds() {
-  effect->update(strip, currentState);
+  effect->update(strip);
   strip.show();
 }
 
@@ -149,7 +164,7 @@ void setup() {
   client.setServer(MQTT_HOST, MQTT_PORT);
   client.setCallback(on_mqtt_message);
 
-  effect = new Effect(currentState);
+  effect = new Effect();
 }
 
 void loop() {

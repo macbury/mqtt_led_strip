@@ -1,25 +1,51 @@
 #include "Effect.h"
 
-Effect::Effect(LedState initialState){
-  _internalState = initialState;
+float lerp(float t, float a, float b){
+  return (1-t)*a + t*b;
 }
 
-void Effect::update(Adafruit_NeoPixel &strip, LedState state) {
-  int color = strip.Color(state.red, state.green, state.blue);
+Effect::Effect(){
+  _initialState = { 0, 0, 0, 0, false };
+  _currentState = _initialState;
+  _targetState = _initialState;
+  _alpha = 0.0f;
+}
+
+void Effect::update(Adafruit_NeoPixel &strip) {
+  _alpha += 0.01f;
+  if (_alpha >= 1.0f) {
+    _alpha = 1.0f; 
+  }
+  _currentState.red = lerp(_alpha, _initialState.red, _targetState.red);
+  _currentState.green = lerp(_alpha, _initialState.green, _targetState.green);
+  _currentState.blue = lerp(_alpha, _initialState.blue, _targetState.blue);
+  _currentState.brightness = lerp(_alpha, _initialState.brightness, _targetState.brightness);
+  
+  int color = strip.Color(_currentState.red, _currentState.green, _currentState.blue);
   for (uint16_t i=0; i < strip.numPixels(); i++) {
-    if (state.enabled) {
+    if (_currentState.enabled) {
       strip.setPixelColor(i, color);
     } else {
       strip.setPixelColor(i, 0);
     }
   }
-  if (state.enabled) {
-    strip.setBrightness(state.brightness);
+  if (_currentState.enabled) {
+    strip.setBrightness(_currentState.brightness);
   } else {
     strip.setBrightness(0);
   }
 }
 
+LedState Effect::getCurrentState() {
+  return _currentState;  
+}
+
 String Effect::name() {
-  return "fade";  
+  return "Fade";  
+}
+
+void Effect::begin(LedState targetState) {
+  _initialState = _currentState;
+  _targetState = targetState;
+  _alpha = 0.0f;
 }

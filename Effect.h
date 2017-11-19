@@ -14,10 +14,15 @@ typedef struct {
  */
 class Effect {
   public:
-    Effect(LedState initialState);
-    void update(Adafruit_NeoPixel &strip, LedState state);
+    Effect();
+    void update(Adafruit_NeoPixel &strip);
+    void begin(LedState targetState);
     String name();
+    LedState getCurrentState();
   private:
-    LedState _internalState;
+    float _alpha;
+    LedState _targetState;
+    LedState _currentState;
+    LedState _initialState;
 };
 #endif
