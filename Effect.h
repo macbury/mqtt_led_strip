@@ -15,7 +15,7 @@ typedef struct {
 class Effect {
   public:
     Effect();
-    void update(Adafruit_NeoPixel &strip);
+    boolean update(Adafruit_NeoPixel &strip);
     void begin(LedState targetState);
     void end();
     String name();

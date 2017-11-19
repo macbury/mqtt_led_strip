@@ -145,8 +145,13 @@ void sendCurrentState() {
 }
 
 void updateLeds() {
-  effect->update(strip);
-  strip.show();
+  if (effect->update(strip)) {
+    strip.show();
+    delay(1000);  
+  } else {
+    strip.show();
+    delay(33);
+  }
 }
 
 void setup() {
@@ -166,8 +171,8 @@ void loop() {
   ensureMqttConnection();
   if (client.connected()) {
     client.loop();
+    updateLeds();
+  } else {
+    delay(5000);
   }
-  
-  delay(33);
-  updateLeds();
 }

@@ -11,7 +11,7 @@ Effect::Effect(){
   _alpha = 0.0f;
 }
 
-void Effect::update(Adafruit_NeoPixel &strip) {
+boolean Effect::update(Adafruit_NeoPixel &strip) {
   _alpha += 0.01f;
   if (_alpha >= 1.0f) {
     _alpha = 1.0f; 
@@ -28,6 +28,8 @@ void Effect::update(Adafruit_NeoPixel &strip) {
     strip.setPixelColor(i, color);
   }
   strip.setBrightness(_currentState.brightness);
+
+  return _alpha == 1.0f;
 }
 
 LedState Effect::getCurrentState() {
