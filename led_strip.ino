@@ -4,7 +4,8 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include "credentials.c"
-#include "Effect.h"
+#include "SingleColor.h"
+#include "SinColor.h"
 
 #define PIN_LED_STRIP D4
 #define PIXEL_COUNT 30
@@ -94,9 +95,12 @@ boolean processJson(char * rawJson) {
 
   if (root.containsKey("effect")) {
     delete effect;
-    if (root["effect"] == "Fade") {
-      Serial.println("Changing effect to Fade");
-      effect = new Effect();
+    if (root["effect"] == "SingleColor") {
+      Serial.println("Changing effect to SingleColor");
+      effect = new SingleColor();
+    } else if (root["effect"] == "SinColor") {
+      Serial.println("Changing effect to SinColor");
+      effect = new SinColor();
     } else {
       Serial.println("Unsuported effect");
     }
@@ -163,7 +167,7 @@ void setup() {
   client.setServer(MQTT_HOST, MQTT_PORT);
   client.setCallback(on_mqtt_message);
 
-  effect = new Effect();
+  effect = new SingleColor();
   setupWifi();
 }
 
