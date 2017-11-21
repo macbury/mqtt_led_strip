@@ -14,7 +14,7 @@ class RainbowColor : public Effect {
       }
       strip.setBrightness(_currentState.brightness);
     
-      return true;
+      return _currentState.brightness > 0.0;
     }
 
     virtual String name() {
