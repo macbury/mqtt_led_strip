@@ -20,7 +20,7 @@ class SinColor : public Effect {
       }
       strip.setBrightness(_currentState.brightness);
     
-      return false;
+      return true;
     }
 
     virtual String name() {

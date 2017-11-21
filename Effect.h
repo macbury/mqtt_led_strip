@@ -47,6 +47,11 @@ class Effect {
     LedState getCurrentState() {
       return _currentState;    
     }
+
+    void resume(LedState currentState) {
+      _currentState = _initialState = currentState;
+    }
+
   protected:
     float _alpha;
     LedState _targetState;
@@ -64,18 +69,25 @@ class Effect {
      * Update state lerp
      */
     void lerpState() {
-      _currentState.red = lerp(_alpha, _initialState.red, _targetState.red);
-      _currentState.green = lerp(_alpha, _initialState.green, _targetState.green);
-      _currentState.blue = lerp(_alpha, _initialState.blue, _targetState.blue);
-      _currentState.brightness = lerp(_alpha, _initialState.brightness, _targetState.brightness);
+      float a = min(1.0, _alpha);
+      _currentState.red = lerp(a, _initialState.red, _targetState.red);
+      _currentState.green = lerp(a, _initialState.green, _targetState.green);
+      _currentState.blue = lerp(a, _initialState.blue, _targetState.blue);
+      _currentState.brightness = lerp(a, _initialState.brightness, _targetState.brightness);
       _currentState.enabled = _initialState.enabled;
     }
 
     void tick() {
       _alpha += 0.01f;
-      if (_alpha >= 1.0f) {
-        _alpha = 1.0f; 
-      }  
+      _alpha = min(_alpha, 1.1f);
+    }
+
+    float min(float a, float b) {
+      if (a > b) {
+        return b;  
+      } else {
+        return a;
+      }
     }
 };
 #endif

@@ -1,11 +1,14 @@
-#include <ArduinoJson.h>
 #include <EEPROM.h>
+
 #include <Adafruit_NeoPixel.h>
+#include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
+
 #include "credentials.c"
 #include "SingleColor.h"
 #include "SinColor.h"
+#include "RainbowColor.h"
 
 #define PIN_LED_STRIP D4
 #define PIXEL_COUNT 30
@@ -25,13 +28,26 @@ void setupWifi() {
   Serial.println("----------");
   Serial.println("Connecting to: ");
   Serial.println(WIFI_SSID);
+  WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   delay(1000);
   randomSeed(micros());
+  printWifiInfo();
+}
+
+void printWifiInfo() {
   Serial.println("");
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
+}
+
+void ensureWifiConnection() {
+  if (WiFi.status() != WL_CONNECTED) {
+    delay(1);
+    Serial.print("WIFI Disconnected. Attempting reconnection.");
+    setupWifi();
+  }
 }
 
 void ensureMqttConnection() {
@@ -44,9 +60,9 @@ void ensureMqttConnection() {
     Serial.print("Client id: ");
     Serial.println(clientId);
     if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD)) {
-      Serial.println("connected");
-      Serial.println("IP address: ");
-      Serial.println(WiFi.localIP());
+      printWifiInfo();
+      Serial.print("Subscribing: ");
+      Serial.println(MQTT_SET_TOPIC);
       client.subscribe(MQTT_SET_TOPIC);
       sendCurrentState();
     } else {
@@ -94,16 +110,18 @@ boolean processJson(char * rawJson) {
   currentState.enabled = root["state"] == CMD_ON;
 
   if (root.containsKey("effect")) {
+    LedState transitionState = effect->getCurrentState();
     delete effect;
-    if (root["effect"] == "SingleColor") {
-      Serial.println("Changing effect to SingleColor");
-      effect = new SingleColor();
+    Serial.print("Changing effect to");
+    if (root["effect"] == "RainbowColor") {
+      effect = new RainbowColor();
     } else if (root["effect"] == "SinColor") {
-      Serial.println("Changing effect to SinColor");
       effect = new SinColor();
     } else {
-      Serial.println("Unsuported effect");
+      Serial.println("Unsuported effect, fallback to default");
+      effect = new SingleColor();
     }
+    effect->resume(transitionState);
   }
 
   if (root.containsKey("color")) {
@@ -151,10 +169,9 @@ void sendCurrentState() {
 void updateLeds() {
   if (effect->update(strip)) {
     strip.show();
-    delay(1000);  
-  } else {
-    strip.show();
     delay(33);
+  } else {
+    delay(500);
   }
 }
 
@@ -166,17 +183,16 @@ void setup() {
   strip.show();
   client.setServer(MQTT_HOST, MQTT_PORT);
   client.setCallback(on_mqtt_message);
-
   effect = new SingleColor();
-  setupWifi();
 }
 
 void loop() {
-  ensureMqttConnection();
   if (client.connected()) {
     client.loop();
     updateLeds();
   } else {
+    ensureWifiConnection();
+    ensureMqttConnection();
     delay(5000);
   }
 }
