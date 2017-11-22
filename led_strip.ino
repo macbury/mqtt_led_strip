@@ -25,12 +25,7 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIN_LED_STRIP, NEO_GRB 
 LedState currentState;
 Effect * effect;
 
-boolean otaEnabled = true;
-
 void setupOTA() {
-  if (!otaEnabled) {
-    Serial.println("ArduinoOTA is disabled!");
-  }
   Serial.println("Configuring ArduinoOTA");
   ArduinoOTA.setPort(OTA_PORT);
   ArduinoOTA.setHostname(OTA_HOST);
@@ -104,8 +99,10 @@ void ensureMqttConnection() {
       Serial.print("Subscribing: ");
       Serial.println(MQTT_SET_TOPIC);
       client.subscribe(MQTT_SET_TOPIC);
-      //TODO subscribe for restart topic and do ESP.restart();
-      //TODO subscribe for enable OTA
+      Serial.println(MQTT_RESET_TOPIC);
+      client.subscribe(MQTT_RESET_TOPIC);
+      Serial.println(MQTT_DEEP_SLEEP_TOPIC);
+      client.subscribe(MQTT_DEEP_SLEEP_TOPIC);
       sendCurrentState();
     } else {
       Serial.print("failed, rc=");
@@ -121,6 +118,7 @@ void on_mqtt_message(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.println("] ");
+  
   /**
    * Transform this to more normal stuff like array of char not a bytefuck
    */
@@ -129,10 +127,29 @@ void on_mqtt_message(char* topic, byte* payload, unsigned int length) {
     message[i] = (char)payload[i];
   }
   message[length] = '\0';
+
+  if (String(MQTT_RESET_TOPIC) == topic) {
+    if (String(message) == CMD_ON) {
+      Serial.println("Enable OTA");
+      setupOTA();
+    } else {
+      Serial.println("Reseting ESP!");
+      ESP.restart();
+    }
+    return;
+  }
+
+  if (String(MQTT_DEEP_SLEEP_TOPIC) == topic) {
+    Serial.println("Starting deep sleep");
+    return;
+  }
+
+  
   Serial.println(message);
 
   if (processJson(message)) {
     sendCurrentState();
+    return;
   }
 }
 
@@ -210,10 +227,9 @@ void sendCurrentState() {
 
 void updateLeds() {
   if (effect->update(strip)) {
-    strip.show();
     delay(33);
   } else {
-    delay(1000);
+    delay(500);
   }
 }
 
@@ -222,7 +238,9 @@ void setup() {
   currentState = { 255, 255, 255, 100, false };
   pinMode(BUILTIN_LED, INPUT);
   strip.begin();
+  strip.setBrightness(0);
   strip.show();
+
   client.setServer(MQTT_HOST, MQTT_PORT);
   client.setCallback(on_mqtt_message);
   effect = new SingleColor();
@@ -230,15 +248,12 @@ void setup() {
 
 void loop() {
   if (client.connected()) {
-    if (otaEnabled) {
-      ArduinoOTA.handle();
-    }
     client.loop();
+    ArduinoOTA.handle();
     updateLeds();
   } else {
     ensureWifiConnection();
     ensureMqttConnection();
-    setupOTA();
     delay(1000);
   }
 }

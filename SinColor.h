@@ -19,7 +19,7 @@ class SinColor : public Effect {
         strip.setPixelColor(i, color);
       }
       strip.setBrightness(_currentState.brightness);
-    
+      strip.show();
       return _currentState.brightness > 0.0;
     }
 

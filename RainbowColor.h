@@ -13,7 +13,7 @@ class RainbowColor : public Effect {
         strip.setPixelColor(i, wheel(strip, i*step+_accumulator));
       }
       strip.setBrightness(_currentState.brightness);
-    
+      strip.show();
       return _currentState.brightness > 0.0;
     }
 
