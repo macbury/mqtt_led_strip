@@ -9,6 +9,7 @@
 #include "SingleColor.h"
 #include "SinColor.h"
 #include "RainbowColor.h"
+#include "DualColor.h"
 
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
@@ -172,7 +173,9 @@ boolean processJson(char * rawJson) {
     LedState transitionState = effect->getCurrentState();
     delete effect;
     Serial.print("Changing effect to");
-    if (root["effect"] == "RainbowColor") {
+    if (root["effect"] == "DualColor") {
+      effect = new DualColor();
+    } else if (root["effect"] == "RainbowColor") {
       effect = new RainbowColor();
     } else if (root["effect"] == "SinColor") {
       effect = new SinColor();
