@@ -13,9 +13,9 @@ class DualColor : public Effect {
         float xi = map(((float)i/pixelCount) * 100, 0, 100, -100, 100) / 100.0;
         float power = pow(xi, 4);
         int color = strip.Color(
-          lerp(power, _currentState.red, 255), 
-          lerp(power, _currentState.green, 255), 
-          lerp(power, _currentState.blue, 255) 
+          lerp(power, _currentState.red, _initialState.red), 
+          lerp(power, _currentState.green, _initialState.green), 
+          lerp(power, _currentState.blue, _initialState.blue) 
         );
 
         strip.setPixelColor(i, color);
