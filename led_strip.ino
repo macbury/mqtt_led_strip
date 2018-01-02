@@ -4,6 +4,9 @@
 #include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 
 #include "credentials.c"
 #include "SingleColor.h"
@@ -12,109 +15,19 @@
 #include "DualColor.h"
 #include "FireEffect.h"
 
-#include <ESP8266mDNS.h>
-#include <WiFiUdp.h>
-#include <ArduinoOTA.h>
-
 const int JSON_BUFFER_SIZE = JSON_OBJECT_SIZE(10);
 const char* CMD_ON = "ON";
 const char* CMD_OFF = "OFF";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+
+#include "iot.h"
+
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIN_LED_STRIP, NEO_GRB + NEO_KHZ800);
 
 LedState currentState;
 Effect * effect;
-
-void setupOTA() {
-  Serial.println("Configuring ArduinoOTA");
-  ArduinoOTA.setPort(OTA_PORT);
-  ArduinoOTA.setHostname(OTA_HOST);
-  ArduinoOTA.setPassword(OTA_PASSWORD);
-
-  ArduinoOTA.onStart([]() {
-    Serial.println("Starting");
-  });
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
-  });
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
-  });
-
-  ArduinoOTA.begin();
-}
-
-void setupWifi() {
-  delay(1000);
-  Serial.println("----------");
-  Serial.println("Connecting to: ");
-  Serial.println(WIFI_SSID);
-  WiFi.mode(WIFI_STA);
-  
-  while (WiFi.waitForConnectResult() != WL_CONNECTED){
-    Serial.print(".");
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    
-    delay(500);
-  }
-  Serial.println("OK!");
-  randomSeed(micros());
-  printWifiInfo();
-}
-
-void printWifiInfo() {
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-}
-
-void ensureWifiConnection() {
-  if (WiFi.status() != WL_CONNECTED) {
-    delay(1);
-    Serial.print("WIFI Disconnected. Attempting reconnection.");
-    setupWifi();
-  }
-}
-
-void ensureMqttConnection() {
-  while (!client.connected()) {
-    delay(1000);
-    Serial.println("Attempting MQTT connection...");
-    // Create a random client ID
-    String clientId = "LedStrip-";
-    clientId += String(random(0xffff), HEX);
-    Serial.print("Client id: ");
-    Serial.println(clientId);
-    if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD)) {
-      printWifiInfo();
-      Serial.print("Subscribing: ");
-      Serial.println(MQTT_SET_TOPIC);
-      client.subscribe(MQTT_SET_TOPIC);
-      Serial.println(MQTT_RESET_TOPIC);
-      client.subscribe(MQTT_RESET_TOPIC);
-      Serial.println(MQTT_DEEP_SLEEP_TOPIC);
-      client.subscribe(MQTT_DEEP_SLEEP_TOPIC);
-      sendCurrentState();
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
-    }
-  }
-}
 
 void on_mqtt_message(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
@@ -252,14 +165,24 @@ void setup() {
   effect = new SingleColor();
 }
 
+void onConnect() {
+  Serial.print("Subscribing: ");
+  Serial.println(MQTT_SET_TOPIC);
+  client.subscribe(MQTT_SET_TOPIC);
+  Serial.println(MQTT_RESET_TOPIC);
+  client.subscribe(MQTT_RESET_TOPIC);
+  Serial.println(MQTT_DEEP_SLEEP_TOPIC);
+  client.subscribe(MQTT_DEEP_SLEEP_TOPIC);
+  sendCurrentState();
+}
+
 void loop() {
   if (client.connected()) {
     client.loop();
     ArduinoOTA.handle();
-    updateLeds();
   } else {
-    ensureWifiConnection();
-    ensureMqttConnection();
-    delay(1000);
+    if (ensureMqttConnection()) {
+      onConnect();
+    }
   }
 }
